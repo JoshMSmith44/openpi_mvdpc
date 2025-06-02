@@ -15,10 +15,12 @@ import tyro
 
 import openpi.models.model as _model
 import openpi.models.pi0 as pi0
+import openpi.models.pi0_mvdpc as pi0_mvdpc
 import openpi.models.pi0_fast as pi0_fast
 import openpi.models.tokenizer as _tokenizer
 import openpi.policies.aloha_policy as aloha_policy
 import openpi.policies.droid_policy as droid_policy
+import openpi.policies.droid_mvdpc_policy as droid_mvdpc_policy
 import openpi.policies.libero_policy as libero_policy
 import openpi.shared.download as _download
 import openpi.shared.normalize as _normalize
@@ -103,6 +105,16 @@ class ModelTransformFactory(GroupFactory):
     def __call__(self, model_config: _model.BaseModelConfig) -> _transforms.Group:
         match model_config.model_type:
             case _model.ModelType.PI0:
+                return _transforms.Group(
+                    inputs=[
+                        _transforms.InjectDefaultPrompt(self.default_prompt),
+                        _transforms.ResizeImages(224, 224),
+                        _transforms.TokenizePrompt(
+                            _tokenizer.PaligemmaTokenizer(model_config.max_token_len),
+                        ),
+                    ],
+                )
+            case _model.ModelType.PI0_MVDPC:
                 return _transforms.Group(
                     inputs=[
                         _transforms.InjectDefaultPrompt(self.default_prompt),
@@ -447,6 +459,20 @@ _CONFIGS = [
             data_transforms=lambda model: _transforms.Group(
                 inputs=[droid_policy.DroidInputs(action_dim=model.action_dim)],
                 outputs=[droid_policy.DroidOutputs()],
+            ),
+            base_config=DataConfig(
+                prompt_from_task=True,
+            ),
+        ),
+    ),
+    TrainConfig(
+        name="pi0_droid_mvdpc",
+        model=pi0_mvdpc.Pi0MVDPCConfig(action_horizon=10),
+        data=SimpleDataConfig(
+            assets=AssetsConfig(asset_id="droid"),
+            data_transforms=lambda model: _transforms.Group(
+                inputs=[droid_mvdpc_policy.DroidInputs(action_dim=model.action_dim)],
+                outputs=[droid_mvdpc_policy.DroidOutputs()],
             ),
             base_config=DataConfig(
                 prompt_from_task=True,
