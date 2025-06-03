@@ -353,11 +353,33 @@ class Pi0_MVDPC(_model.BaseModel):
             v_t_2 = v_fun_2(carry)
             v_t = 0.5 * (v_t_1 + v_t_2)
             return x_t + dt * v_t, time + dt
+        
+        def step_noisy(carry, inner_steps=2):
+            x_t, time, key = carry
+            beta = jnp.abs(dt)
+            sqrt_2_beta = jnp.sqrt(2 * beta)
+            key, subkey = jax.random.split(key)
+            def ula_body(i, x_and_key):
+                x, k = x_and_key
+                k, nkey = jax.random.split(k)
+                v_t = v_fun_1((x, time)) + v_fun_2((x, time))
+                noise = jax.random.normal(nkey, x.shape) 
+                x = x + beta * v_t + noise * sqrt_2_beta
+                return (x, k)
+
+            x_t, subkey = jax.lax.fori_loop(0, inner_steps, ula_body, (x_t, subkey))
+            return x_t, time + dt, key
 
         def cond(carry):
             x_t, time = carry
             # robust to floating-point error
             return time >= -dt / 2
+        
+        def cond_noisy(carry):
+            x_t, time, _ = carry
+            # robust to floating-point error
+            return time >= -dt / 2
 
-        x_0, _ = jax.lax.while_loop(cond, step, (noise, 1.0))
+        #x_0, _ = jax.lax.while_loop(cond, step, (noise, 1.0))
+        x_0, _, _ = jax.lax.while_loop(cond_noisy, step_noisy, (noise, 1.0, rng))
         return x_0
