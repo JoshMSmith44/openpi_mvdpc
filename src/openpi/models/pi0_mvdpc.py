@@ -364,7 +364,7 @@ class Pi0_MVDPC(_model.BaseModel):
                 k, nkey = jax.random.split(k)
                 v_t = v_fun_1((x, time)) + v_fun_2((x, time))
                 noise = jax.random.normal(nkey, x.shape) 
-                x = x - beta * v_t + noise * sqrt_2_beta
+                x = x + dt * v_t + noise * sqrt_2_beta #dt is same magnitude as beta
                 return (x, k)
 
             x_t, subkey = jax.lax.fori_loop(0, inner_steps, ula_body, (x_t, subkey))
